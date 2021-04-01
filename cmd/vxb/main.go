@@ -28,9 +28,9 @@ func main() {
     var arch string
     opt.StringVar(&arch, "arch", "", opt.Required(), opt.Alias("a"),
         opt.Description("The architecture to build for."))
-    var pkgName string
-    opt.StringVar(&pkgName, "pkgname", "", opt.Required(), opt.Alias("p"),
-        opt.Description("The package to build."))
+    var sPkgNames string
+    opt.StringVar(&sPkgNames, "pkgname", "", opt.Required(), opt.Alias("p"),
+        opt.Description("The package(s) to build."))
     var hostArch string
     // Get the host architecture
     var utsname unix.Utsname
@@ -55,6 +55,7 @@ func main() {
     if len(remaining) != 0 {
         fmt.Fprintf(os.Stderr, "Unhandled arguments: %v\n", remaining)
     }
+    pkgNames := str.Split(sPkgNames, " ")
 
     // If the architecture is -musl and the host was not manually set, then
     // the host should also be -musl.
@@ -105,8 +106,8 @@ func main() {
         panic(err)
     }
 
-    fmt.Printf("Generating graph for %s@%s...\n", pkgName, arch)
-    pkgGraph, err := graph.Generate(pkgName, hostArch, arch, vpkgPath)
+    fmt.Printf("Generating graph...\n")
+    pkgGraph, err := graph.Generate(pkgNames, hostArch, arch, vpkgPath)
     if err != nil {
         panic(err)
     }

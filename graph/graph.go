@@ -161,21 +161,27 @@ func (graphS Graph) buildDeps(pkgName string, hostArch string, arch string, vpkg
 }
 
 // Generate the graph
-func Generate(pkgName string, hostArch string, arch string, vpkgPath string) (Graph, error) {
+func Generate(pkgNames []string, hostArch string, arch string, vpkgPath string) (Graph, error) {
     var err error
 
     // Create the DAG + map of pkg dumps
     graph := Graph{g: dag.NewDAG()}
     graph.pkgs = make(map[string]*vpkgs.Pkg)
 
-    // Add the initial package
-    err = graph.addPkg(pkgName, hostArch, arch, vpkgPath)
-    if err != nil {
-        return graph, err
-    }
-    err = graph.buildDeps(pkgName, hostArch, arch, vpkgPath)
-    if err != nil {
-        return graph, err
+    // Add the initial packages
+    for _, pkgName := range pkgNames {
+        fmt.Printf("Graphing %s@%s...\n", pkgName, arch)
+        err = graph.addPkg(pkgName, hostArch, arch, vpkgPath)
+        if errors.Is(err, pkgGraphError) || errors.Is(err, pkgRepoError) {
+            // Skip existing packages
+            continue
+        } else if err != nil {
+            return graph, err
+        }
+        err = graph.buildDeps(pkgName, hostArch, arch, vpkgPath)
+        if err != nil {
+            return graph, err
+        }
     }
 
     return graph, nil
