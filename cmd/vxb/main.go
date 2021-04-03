@@ -8,12 +8,21 @@ import (
     "github.com/fosslinux/vxb/vpkgs"
     "github.com/fosslinux/vxb/graph"
     getoptions "github.com/DavidGamba/go-getoptions"
+    "github.com/go-ini/ini"
     "golang.org/x/sys/unix"
     "errors"
     str "strings"
     "os"
     "fmt"
 )
+
+func checkConfValue(val string, errName string) {
+    if val == "" {
+        // No value was given
+        fmt.Fprintf(os.Stderr, "ERROR: %s must be given in config file or cmdline!\n", errName)
+        os.Exit(1)
+    }
+}
 
 func main() {
     var err error
@@ -23,7 +32,7 @@ func main() {
     opt.SetMode(getoptions.Bundling)
     opt.Bool("help", false, opt.Alias("h"))
     var vpkgPath string
-    opt.StringVar(&vpkgPath, "vpkg", "", opt.Required(), opt.Alias("v"),
+    opt.StringVar(&vpkgPath, "vpkg", "", opt.Alias("v"),
         opt.Description("Path to void-packages checkout."))
     var arch string
     opt.StringVar(&arch, "arch", "", opt.Required(), opt.Alias("a"),
@@ -32,14 +41,11 @@ func main() {
     opt.StringVar(&sPkgNames, "pkgname", "", opt.Required(), opt.Alias("p"),
         opt.Description("The package(s) to build."))
     var hostArch string
-    // Get the host architecture
-    var utsname unix.Utsname
-    err = unix.Uname(&utsname)
-    if err != nil {
-        panic(errors.New("Error getting uname"))
-    }
-    opt.StringVar(&hostArch, "hostarch", string(utsname.Machine[:]),
-        opt.Alias("m"), opt.Description("The host architecture."))
+    opt.StringVar(&hostArch, "hostarch", "", opt.Alias("m"),
+        opt.Description("The host architecture."))
+    var confFile string
+    opt.StringVar(&confFile, "conf", "conf.ini", opt.Alias("c"),
+        opt.Description("Configuration file path."))
 
     // Go parse!
     remaining, err := opt.Parse(os.Args[1:])
@@ -57,6 +63,44 @@ func main() {
     }
     pkgNames := str.Split(sPkgNames, " ")
 
+    // Config parsing
+    // Note this takes a /lower/ priority than option parsing
+    // Declare here to bypass stupid goto rule
+    var cfg *ini.File
+    var utsname unix.Utsname
+    _, confFileExists := os.Stat(confFile)
+    if os.IsNotExist(confFileExists) {
+        if confFile == "conf.ini" {
+            // It is the default and hence there is no config file.
+            goto finishConfFile
+        } else {
+            // We were given a bad config file
+            fmt.Fprintf(os.Stderr, "ERROR: Cannot open config file %s!\n", confFile)
+            os.Exit(1)
+        }
+    }
+
+    cfg, err = ini.Load(confFile)
+
+    // Path to void-packages
+    if vpkgPath == "" {
+        vpkgPath = cfg.Section("vpkg").Key("path").String()
+        checkConfValue(vpkgPath, "path to void packages")
+    }
+    // Host architecture
+    if hostArch == "" {
+        hostArch = cfg.Section("vpkg").Key("host_arch").String()
+        // If there is still nothing, use the default logic
+        if hostArch == "" {
+            err = unix.Uname(&utsname)
+            if err != nil {
+                panic(errors.New("Error getting uname"))
+            }
+            hostArch = string(utsname.Machine[:])
+        }
+    }
+
+    finishConfFile:
     // If the architecture is -musl and the host was not manually set, then
     // the host should also be -musl.
     if str.HasSuffix(arch, "-musl") && hostArch != string(utsname.Machine[:]) {
