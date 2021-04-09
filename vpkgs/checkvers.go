@@ -58,6 +58,8 @@ func checkvers(arch string, vpkgPath string) (Vers, error) {
 
     // Get xbps-checkvers for outdated pkgs
     vers.outdated, err = checkversOutdated(baseArgs)
+    // Remove the dumb empty element on the end
+    vers.outdated = vers.outdated[:len(vers.outdated) - 1]
     if err != nil {
         return vers, err
     }
@@ -91,4 +93,21 @@ func pkgReady(pkgName string, arch string, vpkgPath string) (bool, error) {
 
     // If we get here, it must be present and up-to-date
     return true, nil
+}
+
+// Check if there are any not up to date packages, and list them
+func Ready(arch string, vpkgPath string) (bool, []string, error) {
+    // Run checkvers
+    vers, err := checkvers(arch, vpkgPath)
+    if err != nil {
+        return false, []string{}, err
+    }
+
+    // Make the list
+    outdated := make([]string, len(vers.outdated))
+    for i, line := range(vers.outdated) {
+        outdated[i] = str.Split(line, " ")[0]
+    }
+
+    return len(outdated) == 0, outdated, nil
 }

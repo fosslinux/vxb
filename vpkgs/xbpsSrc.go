@@ -63,7 +63,7 @@ func XbpsSrc(vpkgPath string, hostArch string, arch string, sArgs string) ([]byt
     if err != nil {
         os.RemoveAll("masterdir")
         fmt.Printf("%s\n", string(out[:]))
-        return out, fmt.Errorf("Error %w while executing %s %v", err, cmd.Args)
+        return out, fmt.Errorf("Error %w while executing %s", err, cmd.Args)
     }
 
     // Cleanup

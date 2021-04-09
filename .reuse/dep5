@@ -8,3 +8,11 @@ Source: https://github.com/fosslinux/vxb
 # Files: src/*
 # Copyright: $YEAR $NAME <$CONTACT>
 # License: ...
+
+Files: go.sum go.mod
+Copyright: 2021 fosslinux <fosslinux@aussies.space>
+License: BSD-2-Clause 
+
+Files: .gitignore
+Copyright: 2021 fosslinux <fosslinux@aussies.space>
+License: BSD-2-Clause 
