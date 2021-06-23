@@ -82,6 +82,6 @@ limitations. The steps for this process are:
 | Visual representation of graph                               | :heavy_check_mark:       |
 | Configuration system                                         | :heavy_check_mark:       |
 | Global configuration from Web UI                             | :heavy_exclamation_mark: |
-| Mounting masterdir on tmpfs/zram                             | :x:                      |
+| Mounting masterdir on tmpfs/zram                             | :heavy_check_mark:       |
 | Package signing                                              | :question:               |
 | Repo cleaning                                                | :question:               |

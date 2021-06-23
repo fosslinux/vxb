@@ -6,32 +6,13 @@ package graph
 
 import (
     "github.com/goombaio/dag"
-    "github.com/fosslinux/vxb/vpkgs"
+    "github.com/fosslinux/vxb/build"
+    "github.com/fosslinux/vxb/cfg"
     "fmt"
-    str "strings"
 )
 
-// Build a particular package
-func build(ident string, hostArch string, vpkgPath string) error {
-    var err error
-
-    splitIdent := str.Split(ident, "@")
-    pkgname := splitIdent[0]
-    arch := splitIdent[1]
-
-    // Go!
-    args := "pkg -N " + pkgname
-    out, err := vpkgs.XbpsSrc(vpkgPath, hostArch, arch, args)
-    fmt.Printf("%v", string(out))
-    if err != nil {
-        return fmt.Errorf("%w building %s", err, ident)
-    }
-
-    return nil
-}
-
 // Build the children of a vertex
-func (graphS Graph) children(vertex *dag.Vertex, hostArch string, vpkgPath string) error {
+func (graphS Graph) children(vertex *dag.Vertex, cfg cfg.Cfgs) error {
     graph := graphS.g
     pkgs := graphS.pkgs
 
@@ -50,14 +31,14 @@ func (graphS Graph) children(vertex *dag.Vertex, hostArch string, vpkgPath strin
         }
 
         // Children first again!
-        err = graphS.children(child, hostArch, vpkgPath)
+        err = graphS.children(child, cfg)
         if err != nil {
             return err
         }
 
         // Build this package
         fmt.Printf("Building %s (pulled in by %s)...\n", child.ID, vertex.ID)
-        err = build(child.ID, hostArch, vpkgPath)
+        err = build.Build(child.ID, cfg)
         if err != nil {
             return err
         }
@@ -69,21 +50,21 @@ func (graphS Graph) children(vertex *dag.Vertex, hostArch string, vpkgPath strin
 }
 
 // Build packages in graph
-func (graphS Graph) Build(hostArch string, vpkgPath string) error {
+func (graphS Graph) Build(cfg cfg.Cfgs) error {
     graph := graphS.g
     var err error
 
     // Loop over source vertices (which are never ready)
     for _, vertex := range graph.SourceVertices() {
         // Children first
-        err = graphS.children(vertex, hostArch, vpkgPath)
+        err = graphS.children(vertex, cfg)
         if err != nil {
             return err
         }
 
         // Now we can build
         fmt.Printf("Building %s...\n", vertex.ID)
-        err = build(vertex.ID, hostArch, vpkgPath)
+        err = build.Build(vertex.ID, cfg)
         if err != nil {
             return err
         }

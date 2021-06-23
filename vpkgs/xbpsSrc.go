@@ -44,7 +44,7 @@ func XbpsSrc(vpkgPath string, hostArch string, arch string, sArgs string) ([]byt
                 return errRet, err
             }
             // Actually make the masterdir
-            err = CreateMasterdir(vpkgPath, hostArch)
+            err = CreateMasterdir(vpkgPath, hostArch, "none", "")
             if err != nil {
                 return errRet, err
             }

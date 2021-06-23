@@ -106,6 +106,7 @@ func main() {
     // Perform validations
     cfg.ValidGitEnabled()
     cfg.ValidArchs()
+    cfg.ValidMountSizes()
 
     // Warn if there are modifications NOT being made by default (and we
     // haven't already)
@@ -116,10 +117,6 @@ func main() {
     // Do the actual build
     fmt.Printf("Creating masterdir in %s for %s...\n", cfg.VpkgPath + "/masterdir", cfg.HostArch)
     err = vpkgs.RemoveMasterdir(cfg.VpkgPath)
-    if err != nil {
-        panic(err)
-    }
-    err = vpkgs.CreateMasterdir(cfg.VpkgPath, cfg.HostArch)
     if err != nil {
         panic(err)
     }
@@ -139,7 +136,7 @@ func main() {
         panic(err)
     }
 
-    err = pkgGraph.Build(cfg.HostArch, cfg.VpkgPath)
+    err = pkgGraph.Build(cfg)
     if err != nil {
         panic(err)
     }

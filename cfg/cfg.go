@@ -29,6 +29,12 @@ type Cfgs struct {
     Mods bool
     // Information about the system
     SysInfo *unix.Utsname
+    // Default mount type
+    MountDefault string
+    // Specific package mount types
+    MountPkgs map[string]string
+    // Sizes of different types of mounts
+    MountSize map[string]string
 
     // Other structures
     // All of the git configuration
@@ -38,6 +44,8 @@ type Cfgs struct {
     // Configuration file parsing
     cfgf *ini.File
 }
+
+const LEN_MOUNT_TYPES int = 3;
 
 // Create the options structure
 func (cfg *Cfgs) InitOpt() {
@@ -126,6 +134,49 @@ func (cfg *Cfgs) InitCfg() (bool, error) {
     return true, nil
 }
 
+// Parse the default mount type
+func (cfg *Cfgs) parseMountDefault() {
+    cfg.MountDefault = cfg.cfgf.Section("mount").Key("default").String()
+    if cfg.MountDefault == "" {
+        cfg.MountDefault = "none"
+    // Valid: none, tmpfs, zram, zram-std
+    } else if cfg.MountDefault != "none" &&
+                cfg.MountDefault != "tmpfs" &&
+                cfg.MountDefault != "zram" &&
+                cfg.MountDefault != "zram-zstd" {
+        fmt.Fprintf(os.Stderr, "ERROR: %s is not a valid default mount type (valid: none, tmpfs, zram, zram-zstd.\n");
+        os.Exit(1)
+    }
+}
+
+// Parse the tmpfs size
+func (cfg *Cfgs) parseMountSize() {
+    cfg.MountSize = make(map[string]string)
+    cfg.MountSize["tmpfs"] = cfg.cfgf.Section("mount").Key("tmpfs_size").String()
+    cfg.MountSize["zram"] = cfg.cfgf.Section("mount").Key("zram_size").String()
+    cfg.MountSize["zram-zstd"] = cfg.cfgf.Section("mount").Key("zram_zstd_size").String()
+}
+
+// Parse the mount.pkgs section
+func (cfg *Cfgs) parseMountPkgs() {
+    cfg.MountPkgs = cfg.cfgf.Section("mount.pkgs").KeysHash()
+
+    // Ensure each of the pkgs given is valid as is the type
+    for pkgName, mountType := range cfg.MountPkgs {
+         _, err := os.Stat(cfg.VpkgPath + "/srcpkgs/" + pkgName)
+         if os.IsNotExist(err) {
+             fmt.Fprintf(os.Stderr, "WARN: Package %s does not exist, which was attempted to use %s!", pkgName, mountType)
+         }
+         if mountType != "none" &&
+            mountType != "tmpfs" &&
+            mountType != "zram" &&
+            mountType != "zram-zstd" {
+            fmt.Fprintf(os.Stderr, "ERROR: %s is not a valid package mount type (used for %s).\n", mountType, pkgName)
+            os.Exit(1)
+        }
+    }
+}
+
 // Parse the config file
 func (cfg *Cfgs) ParseCfg() error {
     // Path to void-packages
@@ -156,6 +207,10 @@ func (cfg *Cfgs) ParseCfg() error {
             cfg.Mods = false
         }
     }
+
+    cfg.parseMountDefault()
+    cfg.parseMountPkgs()
+    cfg.parseMountSize()
 
     return nil
 }
@@ -317,7 +372,7 @@ func (cfg *Cfgs) ValidArchs() {
         }
     }
     if !hostFound {
-        fmt.Fprintf(os.Stderr, "ERROR: %s is not a valid architecture.", cfg.HostArch)
+        fmt.Fprintf(os.Stderr, "ERROR: %s is not a valid architecture.\n", cfg.HostArch)
         os.Exit(1)
     }
 
@@ -330,8 +385,27 @@ func (cfg *Cfgs) ValidArchs() {
         }
     }
     if !archFound {
-        fmt.Fprintf(os.Stderr, "ERROR: %s is not a valid architecture.", cfg.Arch)
+        fmt.Fprintf(os.Stderr, "ERROR: %s is not a valid architecture.\n", cfg.Arch)
         os.Exit(1)
+    }
+}
+
+// Validate that we have sizes for types of mounts we use
+func (cfg *Cfgs) ValidMountSizes() {
+    // Checking default
+    if cfg.MountSize[cfg.MountDefault] == "" &&
+        cfg.MountDefault != "none" {
+        fmt.Fprintf(os.Stderr, "ERROR: %s is the default mount type but does not have a size set.\n", cfg.MountDefault)
+        os.Exit(1)
+    }
+
+    // Checking packages
+    for pkgName, mountType := range cfg.MountPkgs {
+        if cfg.MountSize[mountType] == "" &&
+            mountType != "none" {
+            fmt.Fprintf(os.Stderr, "ERROR: %s is the mount type used for %s but does not have a size set.\n", mountType, pkgName)
+            os.Exit(1)
+        }
     }
 }
 
@@ -343,4 +417,3 @@ func (cfg *Cfgs) validDo() {
         os.Exit(1)
     }
 }
-
