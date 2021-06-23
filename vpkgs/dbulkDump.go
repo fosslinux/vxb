@@ -41,7 +41,7 @@ func DbulkDump(pkgName string, hostArch string, arch string, vpkgPath string) (P
     }
 
     // Execute dbulk-dump
-    bOut, err := XbpsSrc(vpkgPath, hostArch, arch, "dbulk-dump " + pkgName)
+    bOut, err := XbpsSrc(vpkgPath, hostArch, arch, "dbulk-dump " + pkgName, false)
     if err != nil {
         return Pkg{}, err
     }

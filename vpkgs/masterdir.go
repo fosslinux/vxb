@@ -38,7 +38,7 @@ func CreateMasterdir(vpkgPath string, arch string, mountType string, size string
     }
 
     // Bootstrap the actual masterdir
-    _, err = XbpsSrc(vpkgPath, arch, arch, "binary-bootstrap " + arch)
+    _, err = XbpsSrc(vpkgPath, arch, arch, "binary-bootstrap " + arch, false)
     if err != nil {
         return err
     }

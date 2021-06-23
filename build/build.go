@@ -30,7 +30,7 @@ func Build(ident string, cfg cfg.Cfgs) error {
 
     // Go!
     args := "pkg -N " + pkgname
-    _, err = vpkgs.XbpsSrc(cfg.VpkgPath, cfg.HostArch, arch, args)
+    _, err = vpkgs.XbpsSrc(cfg.VpkgPath, cfg.HostArch, arch, args, true)
     if err != nil {
         return fmt.Errorf("%w building %s", err, ident)
     }
