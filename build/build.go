@@ -21,22 +21,12 @@ func Build(ident string, cfg cfg.Cfgs) error {
         mountType = cfg.MountDefault
     }
 
-    // Create the masterdir
-    // masterdirs use host arch
-    err = vpkgs.CreateMasterdir(cfg.VpkgPath, cfg.HostArch, mountType, cfg.MountSize[mountType])
-    if err != nil {
-        return fmt.Errorf("%w while creating masterdir\n", err)
-    }
-
     // Go!
     args := "pkg -N " + pkgname
-    _, err = vpkgs.XbpsSrc(cfg.VpkgPath, cfg.HostArch, arch, args, true)
+    _, err = vpkgs.XbpsSrc(args, arch, mountType, true, cfg)
     if err != nil {
         return fmt.Errorf("%w building %s", err, ident)
     }
-
-    // Remove the masterdir
-    err = vpkgs.RemoveMasterdir(cfg.VpkgPath)
 
     return nil
 }

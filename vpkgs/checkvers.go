@@ -5,6 +5,7 @@
 package vpkgs
 
 import (
+    "github.com/fosslinux/vxb/cfg"
     "os"
     "os/exec"
     str "strings"
@@ -39,10 +40,10 @@ func checkversOutdated(baseArgs []string) ([]string, error) {
 }
 
 // Create a Vers struct
-func checkvers(arch string, vpkgPath string) (Vers, error) {
+func checkvers(arch string, cfg cfg.Cfgs) (Vers, error) {
     var err error
     vers := Vers{}
-    baseArgs := []string{"-D", vpkgPath, "-R", vpkgPath + "/hostdir/binpkgs", "-i"}
+    baseArgs := []string{"-D", cfg.VpkgPath, "-R", cfg.VpkgPath + "/hostdir/binpkgs", "-i"}
 
     // Set XBPS_TARGET_ARCH
     err = os.Setenv("XBPS_TARGET_ARCH", arch)
@@ -68,14 +69,15 @@ func checkvers(arch string, vpkgPath string) (Vers, error) {
 }
 
 // Get the state of a package - either ready (true) or not (false)
-func pkgReady(pkgName string, arch string, vpkgPath string) (bool, error) {
+func pkgReady(ident string, cfg cfg.Cfgs) (bool, error) {
     var err error
-    vers, err := checkvers(arch, vpkgPath)
+    arch := str.Split(ident, "@")[1]
+    vers, err := checkvers(arch, cfg)
     if err != nil {
         return false, err
     }
 
-    pkgName = pkgName + " "
+    pkgName := str.Split(ident, "@")[0] + ""
 
     // First, handle case of present and not up-to-date (updated package)
     for _, line := range vers.outdated {
@@ -96,9 +98,9 @@ func pkgReady(pkgName string, arch string, vpkgPath string) (bool, error) {
 }
 
 // Check if there are any not up to date packages, and list them
-func Ready(arch string, vpkgPath string) (bool, []string, error) {
+func Ready(arch string, cfg cfg.Cfgs) (bool, []string, error) {
     // Run checkvers
-    vers, err := checkvers(arch, vpkgPath)
+    vers, err := checkvers(arch, cfg)
     if err != nil {
         return false, []string{}, err
     }

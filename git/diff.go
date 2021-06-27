@@ -3,12 +3,15 @@
 package git
 
 import (
+    "github.com/fosslinux/vxb/cfg"
     "github.com/fosslinux/vxb/vpkgs"
     "errors"
     "fmt"
 )
 
-func (r Repo) Changed(arch string, commits ...string) ([]string, error) {
+func Changed(arch string, cfg cfg.Cfgs, commits ...string) ([]string, error) {
+    r := cfg.Git
+
     var err error
     errRet := []string{}
 
@@ -42,33 +45,33 @@ func (r Repo) Changed(arch string, commits ...string) ([]string, error) {
         }
 
         // Fetch
-        err = r.fetch()
+        err = fetch(cfg)
         if err != nil {
             return errRet, err
         }
 
         // Reconcile with the branch
-        err = r.reconcileRemote()
+        err = reconcileRemote(cfg)
         if err != nil {
             return errRet, err
         }
     }
 
-    return r.changedAb(arch, commita, commitb)
+    return changedAb(arch, commita, commitb, cfg)
 }
 
-func (r Repo) changedAb(arch string, commita string, commitb string) ([]string, error) {
+func changedAb(arch string, commita string, commitb string, cfg cfg.Cfgs) ([]string, error) {
     var err error
     errRet := []string{}
 
     // Perform a sanity check - commita should have NO not up-to-date packages
     // Only test this if we are not going from HEAD
     if commita != "HEAD" {
-        err = r.changeCommit(commita)
+        err = changeCommit(commita, cfg)
         if err != nil {
             return errRet, err
         }
-        ready, notReadyPkgs, err := vpkgs.Ready(arch, r.Path)
+        ready, notReadyPkgs, err := vpkgs.Ready(arch, cfg)
         if err != nil {
             return errRet, err
         }
@@ -79,10 +82,10 @@ func (r Repo) changedAb(arch string, commita string, commitb string) ([]string, 
     }
 
     // Checkout commitb
-    err = r.rebase(commitb)
+    err = rebase(commitb, cfg)
 
     // Check for outdated packges
-    _, outdated, err := vpkgs.Ready(arch, r.Path)
+    _, outdated, err := vpkgs.Ready(arch, cfg)
     if err != nil {
         return outdated, err
     }

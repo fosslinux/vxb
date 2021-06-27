@@ -5,8 +5,8 @@
 package main
 
 import (
-    "github.com/fosslinux/vxb/vpkgs"
     "github.com/fosslinux/vxb/graph"
+    "github.com/fosslinux/vxb/git"
     "github.com/fosslinux/vxb/cfg"
     "os"
     "fmt"
@@ -41,7 +41,7 @@ func genPkgList(cfg cfg.Cfgs) ([]string, error) {
     // Generate the list of packages
     if cfg.Opt.Called("git") {
         // Generate the updated packages between these commits
-        pkgNames, err = cfg.Git.Changed(cfg.Arch, str.Split(cfg.Git.Commits, "...")...)
+        pkgNames, err = git.Changed(cfg.Arch, cfg, str.Split(cfg.Git.Commits, "...")...)
         if err != nil {
             return []string{}, err
         }
@@ -115,19 +115,13 @@ func main() {
     }
 
     // Do the actual build
-    fmt.Printf("Creating masterdir in %s for %s...\n", cfg.VpkgPath + "/masterdir", cfg.HostArch)
-    err = vpkgs.RemoveMasterdir(cfg.VpkgPath)
-    if err != nil {
-        panic(err)
-    }
-
     pkgNames, err := genPkgList(cfg)
     if err != nil {
         panic(err)
     }
 
     fmt.Printf("Generating graph...\n")
-    pkgGraph, err := graph.Generate(pkgNames, cfg.HostArch, cfg.Arch, cfg.VpkgPath)
+    pkgGraph, err := graph.Generate(pkgNames, cfg)
     if err != nil {
         panic(err)
     }

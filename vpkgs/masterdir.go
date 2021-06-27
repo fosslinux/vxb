@@ -5,40 +5,32 @@
 package vpkgs
 
 import (
-    "github.com/fosslinux/vxb/util"
+    "github.com/fosslinux/vxb/cfg"
     "os"
     "fmt"
 )
 
 // Create (i.e. binary-bootstrap) a masterdir
-func CreateMasterdir(vpkgPath string, arch string, mountType string, size string) error {
+func createMasterdir(mountType string, cfg cfg.Cfgs) error {
     var err error
 
-    // Check if we need to handle mounting the masterdir
-    switch mountType {
-    case "none":
-        // No processing is required
-        break
-    case "tmpfs":
-        err = util.MountTmpfs("masterdir", size)
+    // Check if we need to handle different types of masterdirs
+    if mountType == "none" {
+        // Make the actual directory
+        err = os.Mkdir(cfg.VpkgPath + "/masterdir", 0755)
         if err != nil {
-            return err
+            return fmt.Errorf("Unable to create masterdir directory with %w", err)
         }
-    case "zram":
-        // Default is lz4
-        err = util.MountZram("masterdir", size, "lz4")
+    } else {
+        // Make the appropriate symlink
+        err = os.Symlink("mnt/" + mountType, cfg.VpkgPath + "/masterdir")
         if err != nil {
-            return err
-        }
-    case "zram-zstd":
-        err = util.MountZram("masterdir", size, "zstd")
-        if err != nil {
-            return err
+            return fmt.Errorf("Unable to create symlink for masterdir with %w", err)
         }
     }
 
     // Bootstrap the actual masterdir
-    _, err = XbpsSrc(vpkgPath, arch, arch, "binary-bootstrap " + arch, false)
+    _, err = XbpsSrc("binary-bootstrap " + cfg.HostArch, cfg.HostArch, "", false, cfg)
     if err != nil {
         return err
     }
@@ -46,14 +38,28 @@ func CreateMasterdir(vpkgPath string, arch string, mountType string, size string
 }
 
 // Remove a masterdir
-func RemoveMasterdir(vpkgPath string) error {
+func removeMasterdir(cfg cfg.Cfgs) error {
     var err error
 
-    // Unmount it if it is mounted
-    util.Unmount(vpkgPath + "/masterdir")
+    // Remove all subdirectories/files
+    vpkgDir, err := os.Open(cfg.VpkgPath + "/masterdir")
+    if err != nil {
+        return fmt.Errorf("Error %w opening %s", err, cfg.VpkgPath + "/masterdir")
+    }
+    within, err := vpkgDir.Readdir(0)
+    if err != nil {
+        return fmt.Errorf("Error %w listing subfiles/directories within %s", err, cfg.VpkgPath + "/masterdir")
+    }
+    for _, f := range within {
+        // Remove each
+        err = os.RemoveAll(cfg.VpkgPath + "/masterdir/" + f.Name())
+        if err != nil {
+            return fmt.Errorf("Unable to remove %s with %w", cfg.VpkgPath + "/masterdir/" + f.Name(), err)
+        }
+    }
 
-    // Remove remainders
-    err = os.RemoveAll(vpkgPath + "/masterdir")
+    // Finally, remove the directory itself
+    err = os.RemoveAll(cfg.VpkgPath + "/masterdir")
     if err != nil {
         return fmt.Errorf("Unable to remove masterdir with %w", err)
     }

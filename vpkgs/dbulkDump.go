@@ -5,6 +5,7 @@
 package vpkgs
 
 import (
+    "github.com/fosslinux/vxb/cfg"
     str "strings"
 )
 
@@ -27,21 +28,23 @@ func readDbulkDumpList(out []string, i int) ([]string, int) {
 }
 
 // Translate dbulk-dump into a readable format
-func DbulkDump(pkgName string, hostArch string, arch string, vpkgPath string) (Pkg, error) {
+func DbulkDump(ident string, cfg cfg.Cfgs) (Pkg, error) {
     var err error
     var emptyStrSli []string = nil
 
-    // Create the pkg to be returned, with the pkgName
+    // Create the pkg to be returned
     pkg := Pkg{}
 
     // Check if the package is ready
-    pkg.Ready, err = pkgReady(pkgName, arch, vpkgPath)
+    pkg.Ready, err = pkgReady(ident, cfg)
     if err != nil {
         return pkg, err
     }
 
     // Execute dbulk-dump
-    bOut, err := XbpsSrc(vpkgPath, hostArch, arch, "dbulk-dump " + pkgName, false)
+    pkgName := str.Split(ident, "@")[0]
+    arch := str.Split(ident, "@")[1]
+    bOut, err := XbpsSrc("dbulk-dump " + pkgName, arch, cfg.MountDefault, false, cfg)
     if err != nil {
         return Pkg{}, err
     }

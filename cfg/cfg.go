@@ -6,7 +6,6 @@ import (
     getoptions "github.com/DavidGamba/go-getoptions"
     "github.com/go-ini/ini"
     "golang.org/x/sys/unix"
-    "github.com/fosslinux/vxb/git"
     "errors"
     str "strings"
     "os"
@@ -38,11 +37,38 @@ type Cfgs struct {
 
     // Other structures
     // All of the git configuration
-    Git *git.Repo
+    Git *Repo
     // Option parsing
     Opt *getoptions.GetOpt
     // Configuration file parsing
     cfgf *ini.File
+}
+
+// Git configuration/repo struct
+type Repo struct {
+    // Path to the git repo
+    Path string
+    // Git enabled
+    Enable bool
+    // Git commits to find outdated packages between
+    Commits string
+    // Branch name
+    Branch string
+    // Using a remote
+    WithRemote bool
+    // Remote name
+    RemoteName string
+    // Remote branch
+    RemoteBranch string
+    // Strategy to pull in changes from remote
+    // Valid: ff, rebase, merge
+    RemoteStrategy string
+    // Strategy to change commits
+    // Valid: rebase, checkout
+    CommitStrategy string
+    // What do do when merge/rebase/checkout fails
+    // Valid: shell, die
+    ChangeFail string
 }
 
 const LEN_MOUNT_TYPES int = 3;
@@ -52,7 +78,7 @@ func (cfg *Cfgs) InitOpt() {
     cfg.Opt = getoptions.New()
     cfg.Opt.SetMode(getoptions.Bundling)
     // Create the git structure
-    cfgGit := git.Repo{}
+    cfgGit := Repo{}
     cfg.Git = &cfgGit
 }
 

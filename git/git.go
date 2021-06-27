@@ -3,6 +3,7 @@
 package git
 
 import (
+    "github.com/fosslinux/vxb/cfg"
     "fmt"
     "os"
     "os/exec"
@@ -11,7 +12,7 @@ import (
 )
 
 // Execute a git command
-func (r Repo) git(sArgs string) ([]byte, error) {
+func git(sArgs string, cfg cfg.Cfgs) ([]byte, error) {
     var err error
     // TODO: functionality below is very similar to xbpsSrc.go
     // Consolidate into one global function?
@@ -22,9 +23,9 @@ func (r Repo) git(sArgs string) ([]byte, error) {
         return errRet, errors.New("Error getting current working dir")
     }
 
-    err = os.Chdir(r.Path)
+    err = os.Chdir(cfg.Git.Path)
     if err != nil {
-        return errRet, fmt.Errorf("Unable to change directory into %s", r.Path)
+        return errRet, fmt.Errorf("Unable to change directory into %s", cfg.Git.Path)
     }
 
     // Run the actual command
@@ -44,8 +45,10 @@ func (r Repo) git(sArgs string) ([]byte, error) {
 }
 
 // Fetch upstream
-func (r Repo) fetch() error {
-    _, err := r.git(fmt.Sprintf("fetch %s %s", r.RemoteName, r.RemoteBranch))
+func fetch(cfg cfg.Cfgs) error {
+    r := cfg.Git
+
+    _, err := git(fmt.Sprintf("fetch %s %s", r.RemoteName, r.RemoteBranch), cfg)
     if err != nil {
         return err
     }
@@ -53,9 +56,9 @@ func (r Repo) fetch() error {
 }
 
 // Checkout to a commit
-func (r Repo) checkout(commit string) error {
+func checkout(commit string, cfg cfg.Cfgs) error {
     // Checkout
-    _, err := r.git("checkout " + commit)
+    _, err := git("checkout " + commit, cfg)
     if err != nil {
         return err
     }
@@ -63,16 +66,16 @@ func (r Repo) checkout(commit string) error {
 }
 
 // Rebase "work" branch on a specific commit
-func (r Repo) rebase(commit string) error {
+func rebase(commit string, cfg cfg.Cfgs) error {
     var err error
 
     // We first need to be on the tip of the branch we are rebasing in 
-    err = r.checkout(r.Branch)
+    err = checkout(cfg.Git.Branch, cfg)
     if err != nil {
         return err
     }
 
-    _, err = r.git(fmt.Sprintf("rebase --onto %s", commit))
+    _, err = git(fmt.Sprintf("rebase --autostash --onto %s", commit), cfg)
     if err != nil {
         return err
     }
@@ -80,16 +83,18 @@ func (r Repo) rebase(commit string) error {
 }
 
 // Merge the remote into the branch
-func (r Repo) merge() error {
+func merge(cfg cfg.Cfgs) error {
+    r := cfg.Git
+
     var err error
 
     // We first need to be on the tip of the branch we are merging into
-    err = r.checkout(r.Branch)
+    err = checkout(r.Branch, cfg)
     if err != nil {
         return err
     }
 
-    _, err = r.git(fmt.Sprintf("merge %s/%s", r.RemoteName, r.RemoteBranch))
+    _, err = git(fmt.Sprintf("merge %s/%s", r.RemoteName, r.RemoteBranch), cfg)
     if err != nil {
         return err
     }
@@ -99,7 +104,7 @@ func (r Repo) merge() error {
 
 // Check if a rebase is in progress
 // Assumes already chdir()d into the directory
-func (r Repo) rebaseInProgress() bool {
+func rebaseInProgress() bool {
     var err error
 
     _, err = os.Stat(".git/rebase-merge")
@@ -116,7 +121,7 @@ func (r Repo) rebaseInProgress() bool {
 
 // Check if merge is in progress
 // Assumes already chdir()d into the directory
-func (r Repo) mergeInProgress() bool {
+func mergeInProgress() bool {
     _, err := os.Stat(".git/MERGE_HEAD")
     if !os.IsNotExist(err) {
         return true
@@ -125,7 +130,9 @@ func (r Repo) mergeInProgress() bool {
 }
 
 // Check if a rebase/merge is "good" - if not, give the user a change to fix it
-func (r Repo) changeGood(rErr error, initRun bool) error {
+func changeGood(rErr error, initRun bool, cfg cfg.Cfgs) error {
+    r := cfg.Git
+
     var err error
 
     // If there is no error, then we are fine
@@ -178,10 +185,10 @@ func (r Repo) changeGood(rErr error, initRun bool) error {
     }
 
     // But if we didn't actually finish fixing it, do all this again
-    if r.rebaseInProgress() || r.mergeInProgress() {
+    if rebaseInProgress() || mergeInProgress() {
         fmt.Printf("You did not successfully fix the %s!\n", r.CommitStrategy)
         fmt.Printf("Lets try again...\n")
-        err = r.changeGood(rErr, false)
+        err = changeGood(rErr, false, cfg)
         if err != nil {
             return err
         }

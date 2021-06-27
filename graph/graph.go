@@ -5,10 +5,12 @@
 package graph
 
 import (
+    "github.com/fosslinux/vxb/cfg"
     "github.com/fosslinux/vxb/vpkgs"
     "github.com/goombaio/dag"
     "fmt"
     "errors"
+    str "strings"
 )
 
 // Graph struct
@@ -21,11 +23,9 @@ var pkgGraphError = errors.New("Package already exists in graph")
 var pkgRepoError = errors.New("Package is ready in repo")
 
 // Add a package to the graph
-func (graphS Graph) addPkg(pkgName string, hostArch string, arch string, vpkgPath string) error {
+func (graphS Graph) addPkg(ident string, cfg cfg.Cfgs) error {
     var err error
     graph := graphS.g
-
-    ident := pkgName + "@" + arch
 
     _, vertexErr := graph.GetVertex(ident)
     // The only type of error returned is a vertex-not-exist error
@@ -35,7 +35,7 @@ func (graphS Graph) addPkg(pkgName string, hostArch string, arch string, vpkgPat
 
     // The vertex does not already exist
     // Run dbulk-dump
-    dump, err := vpkgs.DbulkDump(pkgName, hostArch, arch, vpkgPath)
+    dump, err := vpkgs.DbulkDump(ident, cfg)
     if err != nil {
         return fmt.Errorf("%w adding ident to graph", err, ident)
     }
@@ -57,11 +57,10 @@ func (graphS Graph) addPkg(pkgName string, hostArch string, arch string, vpkgPat
 }
 
 // Build dependencies of a package into the graph (recursively)
-func (graphS Graph) buildDeps(pkgName string, hostArch string, arch string, vpkgPath string) error {
+func (graphS Graph) buildDeps(baseIdent string, cfg cfg.Cfgs) error {
     graph := graphS.g
 
     var err error
-    baseIdent := pkgName + "@" + arch
 
     baseVertex, err := graph.GetVertex(baseIdent)
     if err != nil {
@@ -75,16 +74,17 @@ func (graphS Graph) buildDeps(pkgName string, hostArch string, arch string, vpkg
     // only should have depends to avoid duplicates.
     var hostdepends []string
     var depends []string
-    if hostArch != arch {
-        hostdepends, err = vpkgs.ResolveSubpackages(pkg.Hostmakedepends, hostArch, hostArch, vpkgPath)
+    arch := str.Split(baseIdent, "@")[1]
+    if cfg.HostArch != arch {
+        hostdepends, err = vpkgs.ResolveSubpackages(pkg.Hostmakedepends, cfg.HostArch, cfg)
         if err != nil {
             return err
         }
     }
-    if hostArch != arch {
-        depends, err = vpkgs.ResolveSubpackages(append(pkg.Makedepends, pkg.Depends...), hostArch, arch, vpkgPath)
+    if cfg.HostArch != arch {
+        depends, err = vpkgs.ResolveSubpackages(append(pkg.Makedepends, pkg.Depends...), arch, cfg)
     } else {
-        depends, err = vpkgs.ResolveSubpackages(append(pkg.Hostmakedepends, append(pkg.Makedepends, pkg.Depends...)...), hostArch, arch, vpkgPath)
+        depends, err = vpkgs.ResolveSubpackages(append(pkg.Hostmakedepends, append(pkg.Makedepends, pkg.Depends...)...), arch, cfg)
     }
     if err != nil {
         return err
@@ -95,7 +95,8 @@ func (graphS Graph) buildDeps(pkgName string, hostArch string, arch string, vpkg
     // ANYTHING for the target arch! This is why arch must be hostArch
     // for all invocations in this block.
     for _, depName := range hostdepends {
-        addPkgErr := graphS.addPkg(depName, hostArch, hostArch, vpkgPath)
+        depIdent := depName + "@" + cfg.HostArch
+        addPkgErr := graphS.addPkg(depIdent, cfg)
         if addPkgErr != nil && !errors.Is(addPkgErr, pkgGraphError) && !errors.Is(addPkgErr, pkgRepoError) {
             return err
         }
@@ -106,7 +107,6 @@ func (graphS Graph) buildDeps(pkgName string, hostArch string, arch string, vpkg
             continue
         }
         // Add the edge
-        depIdent := depName + "@" + hostArch
         depVertex, err := graph.GetVertex(depIdent)
         if err != nil {
             return fmt.Errorf("Error %w fetching vertex %s", err, depIdent)
@@ -119,7 +119,7 @@ func (graphS Graph) buildDeps(pkgName string, hostArch string, arch string, vpkg
         // Don't build it's deps if it already exists in the graph - no need
         // to repeat that work.
         if !errors.Is(addPkgErr, pkgGraphError) {
-            err = graphS.buildDeps(depName, hostArch, hostArch, vpkgPath)
+            err = graphS.buildDeps(depIdent, cfg)
             if err != nil {
                 return err
             }
@@ -129,7 +129,8 @@ func (graphS Graph) buildDeps(pkgName string, hostArch string, arch string, vpkg
     // Now, depends (makedepends + depends) - these are handled with
     // depName@arch.
     for _, depName := range depends {
-        addPkgErr := graphS.addPkg(depName, hostArch, arch, vpkgPath)
+        depIdent := depName + "@" + arch
+        addPkgErr := graphS.addPkg(depIdent, cfg)
         if addPkgErr != nil && !errors.Is(addPkgErr, pkgGraphError) && !errors.Is(addPkgErr, pkgRepoError) {
             return err
         }
@@ -139,7 +140,6 @@ func (graphS Graph) buildDeps(pkgName string, hostArch string, arch string, vpkg
             continue
         }
         // Add edge
-        depIdent := depName + "@" + arch
         depVertex, err := graph.GetVertex(depIdent)
         if err != nil {
             return fmt.Errorf("Error %w fetching vertex %s", err, depIdent)
@@ -150,7 +150,7 @@ func (graphS Graph) buildDeps(pkgName string, hostArch string, arch string, vpkg
         }
         // Recurse
         if !errors.Is(addPkgErr, pkgGraphError) {
-            err = graphS.buildDeps(depName, hostArch, arch, vpkgPath)
+            err = graphS.buildDeps(depIdent, cfg)
             if err != nil {
                 return err
             }
@@ -161,7 +161,7 @@ func (graphS Graph) buildDeps(pkgName string, hostArch string, arch string, vpkg
 }
 
 // Generate the graph
-func Generate(pkgNames []string, hostArch string, arch string, vpkgPath string) (Graph, error) {
+func Generate(pkgNames []string, cfg cfg.Cfgs) (Graph, error) {
     var err error
 
     // Create the DAG + map of pkg dumps
@@ -170,15 +170,15 @@ func Generate(pkgNames []string, hostArch string, arch string, vpkgPath string) 
 
     // Add the initial packages
     for _, pkgName := range pkgNames {
-        fmt.Printf("Graphing %s@%s...\n", pkgName, arch)
-        err = graph.addPkg(pkgName, hostArch, arch, vpkgPath)
+        fmt.Printf("Graphing %s@%s...\n", pkgName, cfg.Arch)
+        err = graph.addPkg(pkgName + "@" + cfg.Arch, cfg)
         if errors.Is(err, pkgGraphError) || errors.Is(err, pkgRepoError) {
             // Skip existing packages
             continue
         } else if err != nil {
             return graph, err
         }
-        err = graph.buildDeps(pkgName, hostArch, arch, vpkgPath)
+        err = graph.buildDeps(pkgName + "@" + cfg.Arch, cfg)
         if err != nil {
             return graph, err
         }

@@ -3,39 +3,15 @@
 package git
 
 import (
+    "github.com/fosslinux/vxb/cfg"
     "errors"
     "fmt"
 )
 
-// Git configuration/repo struct
-type Repo struct {
-    // Path to the git repo
-    Path string
-    // Git enabled
-    Enable bool
-    // Git commits to find outdated packages between
-    Commits string
-    // Branch name
-    Branch string
-    // Using a remote
-    WithRemote bool
-    // Remote name
-    RemoteName string
-    // Remote branch
-    RemoteBranch string
-    // Strategy to pull in changes from remote
-    // Valid: ff, rebase, merge
-    RemoteStrategy string
-    // Strategy to change commits
-    // Valid: rebase, checkout
-    CommitStrategy string
-    // What do do when merge/rebase/checkout fails
-    // Valid: shell, die
-    ChangeFail string
-}
-
 // Change the commit according to cfg
-func (r Repo) changeCommit(commit string) error {
+func changeCommit(commit string, cfg cfg.Cfgs) error {
+    r := cfg.Git
+
     var err error
 
     // We have a special value, tip, meaning the tip of the "working" branch,
@@ -53,9 +29,9 @@ func (r Repo) changeCommit(commit string) error {
     // Perform the action
     switch r.CommitStrategy {
         case "rebase":
-            err = r.rebase(commit)
+            err = rebase(commit, cfg)
         case "checkout":
-            err = r.checkout(commit)
+            err = checkout(commit, cfg)
     }
 
     // Check it worked
@@ -66,7 +42,7 @@ func (r Repo) changeCommit(commit string) error {
                 return err
             // But we can for a rebase
             case "rebase":
-                err = r.changeGood(err, true)
+                err = changeGood(err, true, cfg)
                 if err != nil {
                     return err
                 }
@@ -77,19 +53,21 @@ func (r Repo) changeCommit(commit string) error {
 }
 
 // Merge/rebase the remote into the branch according to cfg
-func (r Repo) reconcileRemote() error {
+func reconcileRemote(cfg cfg.Cfgs) error {
+    r := cfg.Git
+
     var err error
 
     // Perform the action
     switch r.RemoteStrategy {
         case "rebase":
-            err = r.rebase(fmt.Sprintf("%s/%s", r.RemoteName, r.RemoteBranch))
+            err = rebase(fmt.Sprintf("%s/%s", r.RemoteName, r.RemoteBranch), cfg)
         case "merge":
-            err = r.merge()
+            err = merge(cfg)
     }
 
     // Check it worked
-    err = r.changeGood(err, true)
+    err = changeGood(err, true, cfg)
     if err != nil {
         return err
     }

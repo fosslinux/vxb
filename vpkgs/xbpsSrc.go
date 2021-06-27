@@ -5,6 +5,7 @@
 package vpkgs
 
 import (
+    "github.com/fosslinux/vxb/cfg"
     "fmt"
     "errors"
     "os"
@@ -15,7 +16,7 @@ import (
 )
 
 // Run an xbps-src command
-func XbpsSrc(vpkgPath string, hostArch string, arch string, sArgs string, rtOut bool) ([]byte, error) {
+func XbpsSrc(sArgs string, arch string, mountType string, rtOut bool, cfg cfg.Cfgs) ([]byte, error) {
     var err error
     errRet := make([]byte, 1)
     errRet[0] = 0
@@ -25,37 +26,26 @@ func XbpsSrc(vpkgPath string, hostArch string, arch string, sArgs string, rtOut 
         return errRet, errors.New("Error getting current working directory")
     }
 
-    err = os.Chdir(vpkgPath)
+    err = os.Chdir(cfg.VpkgPath)
     if err != nil {
-        return errRet, fmt.Errorf("Unable to change directory into %s", vpkgPath)
+        return errRet, fmt.Errorf("Unable to change directory into %s", cfg.VpkgPath)
     }
 
     aArgs := str.Fields(sArgs)
 
-    // Create the masterdir if it dosen't exist
+    // Create the masterdir
     // If we are binary-bootstrapping we don't care though
     if aArgs[0] != "binary-bootstrap" {
-        _, checkA := os.Stat("masterdir")
-        // An arbitary path that exists inside a working masterdir
-        _, checkB := os.Stat("masterdir/usr")
-        if os.IsNotExist(checkA) || os.IsNotExist(checkB) {
-            // The masterdir dosen't exist
-            // Kill off anything that already exists
-            err = RemoveMasterdir(vpkgPath)
-            if err != nil {
-                return errRet, err
-            }
-            // Actually make the masterdir
-            err = CreateMasterdir(vpkgPath, hostArch, "none", "")
-            if err != nil {
-                return errRet, err
-            }
+        // Rememebr masterdirs use host arch
+        err = createMasterdir(mountType, cfg)
+        if err != nil {
+            return errRet, err
         }
     }
 
     // Run the actual command
     var cmd *exec.Cmd
-    if hostArch == arch || aArgs[0] == "binary-bootstrap" {
+    if cfg.HostArch == arch || aArgs[0] == "binary-bootstrap" {
         // We should not use -a
         cmd = exec.Command("./xbps-src", aArgs...)
     } else {
@@ -101,7 +91,10 @@ func XbpsSrc(vpkgPath string, hostArch string, arch string, sArgs string, rtOut 
         }(&wg)
 
         wg.Wait()
-        cmd.Wait()
+        err = cmd.Wait()
+        if err != nil {
+            goto errHandler
+        }
 
         // We have nothing to return (errRet is just empty)
         out = errRet
@@ -113,12 +106,15 @@ func XbpsSrc(vpkgPath string, hostArch string, arch string, sArgs string, rtOut 
     }
 
     // Cleanup
+    if aArgs[0] != "binary-bootstrap" {
+        removeMasterdir(cfg)
+    }
     os.Chdir(curDir)
 
     return out, nil
 
 errHandler:
-    RemoveMasterdir(vpkgPath)
+    removeMasterdir(cfg)
     fmt.Printf("%s\n", string(out[:]))
     return out, fmt.Errorf("Error %w while executing %s", err, cmd.Args)
 }

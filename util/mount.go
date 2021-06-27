@@ -9,6 +9,8 @@ import (
 
 const TMPFS_MAGIC = 0x01021994
 
+// Note: These mount functions assume root.
+
 // Mount a tmpfs on a directory
 func MountTmpfs(directory string, size string) error {
     err := unix.Mount("tmpfs", directory, "tmpfs", 0, "size=" + size)
@@ -23,10 +25,7 @@ func MountZram(directory string, size string, compression string) error {
     var err error
 
     // Firstly, create the zram device
-    cmd, err := Sudo("zramctl", "-s", size, "-a", compression, "-f")
-    if err != nil {
-        return fmt.Errorf("Error %w creating zram device", err)
-    }
+    cmd := exec.Command("zramctl", "-s", size, "-a", compression, "-f")
     devRaw, err := cmd.CombinedOutput()
     if err != nil {
         return fmt.Errorf("Error %w creating zram device", err)
@@ -38,10 +37,7 @@ func MountZram(directory string, size string, compression string) error {
     // without shelling out to cat?
 
     // Create an ext4 filesystem on it
-    cmd, err = Sudo("mkfs.ext4", "-O", "^has_journal", dev)
-    if err != nil {
-        return fmt.Errorf("Error %w creating ext4 filesystem on %s", err, dev)
-    }
+    cmd = exec.Command("mkfs.ext4", "-O", "^has_journal", dev)
     err = cmd.Run()
     if err != nil {
         return fmt.Errorf("Error %w creating ext4 filesystem on %s", err, dev)
@@ -49,9 +45,16 @@ func MountZram(directory string, size string, compression string) error {
 
     // Finally, mount that
     // The mount options ensure ext4 uses as little memory as possible
-    err = unix.Mount(dev, directory, "ext4", 0, "discard,noatime,nodiratime")
+    err = unix.Mount(dev, directory, "ext4", 0, "discard")
     if err != nil {
         return fmt.Errorf("Error %w mounting %s on %s", err, dev, directory)
+    }
+
+    // Also chattr for no atime updates
+    cmd = exec.Command("chattr", "+A", directory)
+    err = cmd.Run()
+    if err != nil {
+        return fmt.Errorf("Error %w disabling atime on %s", err, directory)
     }
 
     return nil
@@ -87,7 +90,7 @@ func zramDev(directory string) (string, error) {
     data := str.Split(sData, "\n")
 
     for _, line := range data {
-        if str.Contains(line, " " + directory) {
+        if str.HasSuffix(str.TrimSpace(line), " " + directory) {
             // This is the one with the data
             return str.Split(line, " ")[0], nil
         }
@@ -101,27 +104,30 @@ func zramDev(directory string) (string, error) {
 func Unmount(directory string) error {
     var err error
 
-    // Unmount
-    err = unix.Unmount(directory, 0)
-    if err != nil {
-        return fmt.Errorf("Error %w unmounting directory %s", err, directory)
-    }
-
     // Check if it is a zram
     isZram, err := isZram(directory)
     if err != nil {
         return err
     }
     // If so, then we need to also destroy the zram
+    // But only get the information now
+    var dev string
     if isZram {
-        dev, err := zramDev(directory)
+        dev, err = zramDev(directory)
         if err != nil {
-            return fmt.Errorf("Error %w destroying zram %s", err, directory)
+            return fmt.Errorf("Error %w getting device for zram %s", err, directory)
         }
-        cmd, err := Sudo("zramctl", "--reset", dev)
-        if err != nil {
-            return fmt.Errorf("Error %w destroying zram %s", err, directory)
-        }
+    }
+
+    // Unmount
+    err = unix.Unmount(directory, 0)
+    if err != nil {
+        return fmt.Errorf("Error %w unmounting directory %s", err, directory)
+    }
+
+    // Perform the actual zram destruction
+    if isZram {
+        cmd := exec.Command("zramctl", "--reset", dev)
         err = cmd.Run()
         if err != nil {
             return fmt.Errorf("Error %w destroying zram %s", err, directory)

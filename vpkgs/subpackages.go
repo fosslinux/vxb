@@ -5,14 +5,17 @@
 package vpkgs
 
 import (
+    "github.com/fosslinux/vxb/cfg"
     "fmt"
     "os"
+    str "strings"
 )
 
 // Check if a package is a subpackage
-func isSubpackage(pkgName string, hostArch string, arch string, vpkgPath string) (bool, error) {
+func isSubpackage(ident string, cfg cfg.Cfgs) (bool, error) {
+    pkgName := str.Split(ident, "@")[0]
     // dbulk-dump the supposed subpackage
-    dump, err := DbulkDump(pkgName, hostArch, arch, vpkgPath)
+    dump, err := DbulkDump(ident, cfg)
     if err != nil {
         return false, fmt.Errorf("%w finding if %s is a subpackage", err, pkgName)
     }
@@ -27,20 +30,20 @@ func isSubpackage(pkgName string, hostArch string, arch string, vpkgPath string)
 }
 
 // Resolve a subpackage to its base package
-func ResolveSubpackage(pkgName string, hostArch string, arch string, vpkgPath string) (string, error) {
+func ResolveSubpackage(ident string, cfg cfg.Cfgs) (string, error) {
     var err error
     // If it isn't a subpackage we don't need to resolve anything
-    pkgIsSubpkg, err := isSubpackage(pkgName, hostArch, arch, vpkgPath)
+    pkgIsSubpkg, err := isSubpackage(ident, cfg)
     if err != nil {
         return "", err
     }
     if !pkgIsSubpkg {
-        return pkgName, nil
+        return str.Split(ident, "@")[0], nil
     }
 
     // Ok, so it is a subpackage
     // Read the link in srcpkgs/ to determine the base package
-    rslvPath := vpkgPath + "/srcpkgs/" + pkgName
+    rslvPath := cfg.VpkgPath + "/srcpkgs/" + str.Split(ident, "@")[0]
     basePkg, err := os.Readlink(rslvPath)
     if err != nil {
         return "", fmt.Errorf("Error %w resolving %s", err, rslvPath)
@@ -49,11 +52,11 @@ func ResolveSubpackage(pkgName string, hostArch string, arch string, vpkgPath st
 }
 
 // Resolve subpackages in array to base packages
-func ResolveSubpackages(pkgNames []string, hostArch string, arch string, vpkgPath string) ([]string, error) {
+func ResolveSubpackages(pkgNames []string, arch string, cfg cfg.Cfgs) ([]string, error) {
     var basePkgs []string
     // Loop over array
     for _, pkgName := range pkgNames {
-        basePkg, err := ResolveSubpackage(pkgName, hostArch, arch, vpkgPath)
+        basePkg, err := ResolveSubpackage(pkgName + "@" + arch, cfg)
         if err != nil {
             return []string{}, err
         }
