@@ -81,14 +81,14 @@ func pkgReady(ident string, cfg cfg.Cfgs) (bool, error) {
 
     // First, handle case of present and not up-to-date (updated package)
     for _, line := range vers.outdated {
-        if str.HasPrefix(line, pkgName) {
+        if str.Split(line, " ")[0] == pkgName {
             return false, nil
         }
     }
 
     // Next, not present (new package)
     for _, line := range vers.all {
-        if str.HasPrefix(line, pkgName + "?") {
+        if str.Split(line, " ")[0] == pkgName && str.Split(line, " ")[1] == "?" {
             return false, nil
         }
     }

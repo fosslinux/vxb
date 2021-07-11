@@ -36,10 +36,10 @@ func XbpsSrc(sArgs string, arch string, mountType string, rtOut bool, cfg cfg.Cf
     // Create the masterdir
     // If we are binary-bootstrapping we don't care though
     if aArgs[0] != "binary-bootstrap" {
-        // Rememebr masterdirs use host arch
-        err = createMasterdir(mountType, cfg)
-        if err != nil {
-            return errRet, err
+        // Check a masterdir exists
+        _, err := os.Stat(cfg.VpkgPath + "/masterdir/usr")
+        if os.IsNotExist(err) {
+            return errRet, errors.New("masterdir not bootstrapped")
         }
     }
 
@@ -106,15 +106,12 @@ func XbpsSrc(sArgs string, arch string, mountType string, rtOut bool, cfg cfg.Cf
     }
 
     // Cleanup
-    if aArgs[0] != "binary-bootstrap" {
-        removeMasterdir(cfg)
-    }
     os.Chdir(curDir)
 
     return out, nil
 
 errHandler:
-    removeMasterdir(cfg)
+    RemoveMasterdir(cfg)
     fmt.Printf("%s\n", string(out[:]))
     return out, fmt.Errorf("Error %w while executing %s", err, cmd.Args)
 }

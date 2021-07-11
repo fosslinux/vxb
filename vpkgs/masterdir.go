@@ -11,7 +11,7 @@ import (
 )
 
 // Create (i.e. binary-bootstrap) a masterdir
-func createMasterdir(mountType string, cfg cfg.Cfgs) error {
+func CreateMasterdir(mountType string, cfg cfg.Cfgs) error {
     var err error
 
     // Check if we need to handle different types of masterdirs
@@ -38,7 +38,7 @@ func createMasterdir(mountType string, cfg cfg.Cfgs) error {
 }
 
 // Remove a masterdir
-func removeMasterdir(cfg cfg.Cfgs) error {
+func RemoveMasterdir(cfg cfg.Cfgs) error {
     var err error
 
     // Remove all subdirectories/files

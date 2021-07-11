@@ -168,6 +168,12 @@ func Generate(pkgNames []string, cfg cfg.Cfgs) (Graph, error) {
     graph := Graph{g: dag.NewDAG()}
     graph.pkgs = make(map[string]*vpkgs.Pkg)
 
+    // Create the masterdir to be used for all graphing operations
+    err = vpkgs.CreateMasterdir(cfg.MountDefault, cfg)
+    if err != nil {
+        return graph, err
+    }
+
     // Add the initial packages
     for _, pkgName := range pkgNames {
         fmt.Printf("Graphing %s@%s...\n", pkgName, cfg.Arch)
@@ -176,12 +182,22 @@ func Generate(pkgNames []string, cfg cfg.Cfgs) (Graph, error) {
             // Skip existing packages
             continue
         } else if err != nil {
+            // Attempt to remove masterdir
+            vpkgs.RemoveMasterdir(cfg)
             return graph, err
         }
         err = graph.buildDeps(pkgName + "@" + cfg.Arch, cfg)
         if err != nil {
+            // Attempt to remove masterdir
+            vpkgs.RemoveMasterdir(cfg)
             return graph, err
         }
+    }
+
+    // Destroy masterdir used
+    err = vpkgs.RemoveMasterdir(cfg)
+    if err != nil {
+        return graph, err
     }
 
     return graph, nil
