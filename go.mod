@@ -8,5 +8,6 @@ require (
 	github.com/DavidGamba/go-getoptions v0.23.0
 	github.com/go-ini/ini v1.62.0
 	github.com/goombaio/dag v0.0.0-20181006234417-a8874b1f72ff
+	github.com/ryanuber/go-glob v1.0.0
 	golang.org/x/sys v0.0.0-20210326220804-49726bf1d181
 )

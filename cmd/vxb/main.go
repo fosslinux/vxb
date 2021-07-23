@@ -105,8 +105,6 @@ func main() {
 
     // Perform validations
     cfg.ValidGitEnabled()
-    cfg.ValidArchs()
-    cfg.ValidMountSizes()
 
     // Warn if there are modifications NOT being made by default (and we
     // haven't already)

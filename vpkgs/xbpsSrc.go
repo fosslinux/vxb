@@ -33,6 +33,12 @@ func XbpsSrc(sArgs string, arch string, mountType string, rtOut bool, cfg cfg.Cf
 
     aArgs := str.Fields(sArgs)
 
+    // Add -r xyz if we need to
+    repo, repoExists := cfg.SubRepos[arch]
+    if repoExists {
+        aArgs = append(aArgs, "-r", repo)
+    }
+
     // Create the masterdir
     // If we are binary-bootstrapping we don't care though
     if aArgs[0] != "binary-bootstrap" {

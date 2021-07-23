@@ -43,7 +43,14 @@ func checkversOutdated(baseArgs []string) ([]string, error) {
 func checkvers(arch string, cfg cfg.Cfgs) (Vers, error) {
     var err error
     vers := Vers{}
-    baseArgs := []string{"-D", cfg.VpkgPath, "-R", cfg.VpkgPath + "/hostdir/binpkgs", "-i"}
+
+    // Add a subdirectory to the binpkg path
+    binpkgs := "/hostdir/binpkgs/"
+    subDir, subdirExists := cfg.SubRepos[arch]
+    if subdirExists {
+        binpkgs += subDir
+    }
+    baseArgs := []string{"-D", cfg.VpkgPath, "-R", cfg.VpkgPath + binpkgs, "-i"}
 
     // Set XBPS_TARGET_ARCH
     err = os.Setenv("XBPS_TARGET_ARCH", arch)

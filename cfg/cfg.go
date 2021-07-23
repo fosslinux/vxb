@@ -4,9 +4,9 @@ package cfg
 
 import (
     getoptions "github.com/DavidGamba/go-getoptions"
+    "github.com/ryanuber/go-glob"
     "github.com/go-ini/ini"
     "golang.org/x/sys/unix"
-    "errors"
     str "strings"
     "os"
     "fmt"
@@ -16,6 +16,8 @@ import (
 type Cfgs struct {
     // Path to void-packges checkout
     VpkgPath string
+    // "subrepo" i.e. -r argument
+    SubRepos map[string]string
     // Architecture to build for
     Arch string
     // Packages to build (specified on cmdline)
@@ -73,10 +75,20 @@ type Repo struct {
     ChangeFail string
 }
 
-const LEN_MOUNT_TYPES int = 3;
+// Basic list of valid architectures
+var validArchs = []string{"aarch64", "armv5tel", "armv6l", "armv7l", "i686",
+    "mips-musl", "mipsel-musl", "mipselhf-musl", "mipshf-musl", "ppc",
+    "ppc64", "ppc64le", "ppcle", "x86_64"}
 
 // Create the options structure
 func (cfg *Cfgs) InitOpt() {
+    // Add -musl variants to validArchs
+    for _, arch := range validArchs {
+        if !str.HasSuffix(arch, "-musl") {
+            validArchs = append(validArchs, arch + "-musl")
+        }
+    }
+
     cfg.Opt = getoptions.New()
     cfg.Opt.SetMode(getoptions.Bundling)
     // Create the git structure
@@ -205,25 +217,47 @@ func (cfg *Cfgs) parseMountPkgs() {
     }
 }
 
+// Parse subrepos
+func (cfg *Cfgs) parseSubrepo() {
+    original := cfg.cfgf.Section("vpkg.subrepo").KeysHash()
+    // Init map
+    cfg.SubRepos = make(map[string]string)
+
+    // Expand globs + validate
+    for pattern, value := range original {
+        found := false
+        // Test pattern against each arch
+        for _, arch := range validArchs {
+            if glob.Glob(pattern, arch) {
+                found = true
+                cfg.SubRepos[arch] = value
+            }
+        }
+        // Error out if nothing was found
+        if !found {
+            fmt.Fprintf(os.Stderr, "ERROR: No architecture matches to %s.\n", pattern)
+            os.Exit(1)
+        }
+    }
+}
+
 // Parse the config file
 func (cfg *Cfgs) ParseCfg() error {
+    var err error
+
     // Path to void-packages
     if !cfg.Opt.Called("vpkg") {
         cfg.VpkgPath = cfg.cfgf.Section("vpkg").Key("path").String()
     }
 
-    // Host architecture
-    if !cfg.Opt.Called("hostarch") {
-        cfg.HostArch = cfg.cfgf.Section("vpkg").Key("host_arch").String()
-        // If there is still nothing, use the default logic
-        if cfg.HostArch == "" {
-            err := unix.Uname(cfg.SysInfo)
-            if err != nil {
-                panic(errors.New("Error getting uname"))
-            }
-            cfg.HostArch = string(cfg.SysInfo.Machine[:])
-        }
+    err = cfg.parseHostArch()
+    if err != nil {
+        return err
     }
+
+    cfg.parseSubrepo()
+
+    cfg.validateArch()
 
     // Modifications
     if !cfg.Opt.Called("mods") {
@@ -239,6 +273,37 @@ func (cfg *Cfgs) ParseCfg() error {
     cfg.parseMountDefault()
     cfg.parseMountPkgs()
     cfg.parseMountSize()
+    cfg.validateMountSizes()
+
+    return nil
+}
+
+// Parse hostarch
+func (cfg *Cfgs) parseHostArch() error {
+    // Host architecture
+    if !cfg.Opt.Called("hostarch") {
+        cfg.HostArch = cfg.cfgf.Section("vpkg").Key("host_arch").String()
+        // If there is still nothing, use the default logic
+        if cfg.HostArch == "" {
+            err := unix.Uname(cfg.SysInfo)
+            if err != nil {
+                return fmt.Errorf("Error %w getting information about system", err)
+            }
+            cfg.HostArch = string(cfg.SysInfo.Machine[:])
+        }
+    }
+    // Check hostArch
+    hostFound := false
+    for _, tArch := range validArchs {
+        if tArch == cfg.HostArch {
+            hostFound = true
+            break
+        }
+    }
+    if !hostFound {
+        fmt.Fprintf(os.Stderr, "ERROR: %s is not a valid architecture.\n", cfg.HostArch)
+        os.Exit(1)
+    }
 
     return nil
 }
@@ -379,31 +444,7 @@ func (cfg *Cfgs) ValidGitEnabled() {
 }
 
 // Validate arch and hostArch are known
-func (cfg *Cfgs) ValidArchs() {
-    // Basic list of valid architectures
-    validArchs := []string{"aarch64", "armv5tel", "armv6l", "armv7l", "i686",
-        "mips-musl", "mipsel-musl", "mipselhf-musl", "mipshf-musl", "ppc",
-        "ppc64", "ppc64le", "ppcle", "x86_64"}
-    // Add -musl variants
-    for _, arch := range validArchs {
-        if !str.HasSuffix(arch, "-musl") {
-            validArchs = append(validArchs, arch + "-musl")
-        }
-    }
-
-    // Check hostArch
-    hostFound := false
-    for _, tArch := range validArchs {
-        if tArch == cfg.HostArch {
-            hostFound = true
-            break
-        }
-    }
-    if !hostFound {
-        fmt.Fprintf(os.Stderr, "ERROR: %s is not a valid architecture.\n", cfg.HostArch)
-        os.Exit(1)
-    }
-
+func (cfg *Cfgs) validateArch() {
     // Check arch
     archFound := false
     for _, tArch := range validArchs {
@@ -419,7 +460,7 @@ func (cfg *Cfgs) ValidArchs() {
 }
 
 // Validate that we have sizes for types of mounts we use
-func (cfg *Cfgs) ValidMountSizes() {
+func (cfg *Cfgs) validateMountSizes() {
     // Checking default
     if cfg.MountSize[cfg.MountDefault] == "" &&
         cfg.MountDefault != "none" {

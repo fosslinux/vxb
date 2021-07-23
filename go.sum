@@ -9,5 +9,7 @@ github.com/goombaio/orderedmap v0.0.0-20180924084748-ba921b7e2419 h1:SajEQ6tktpF
 github.com/goombaio/orderedmap v0.0.0-20180924084748-ba921b7e2419/go.mod h1:YKu81H3RSd1cFh0d7NhvUoTtUC9IY/vBX0WUQb1/o4Y=
 github.com/goombaio/orderedset v0.0.0-20180924084730-d1b9fdd81eca h1:RiwElNGM1lrT2a3hAuQn36nM4HWI4bOgIWi077O33Yk=
 github.com/goombaio/orderedset v0.0.0-20180924084730-d1b9fdd81eca/go.mod h1:6oeyMssEjbCGe1BCbSckd6C1TYxeP5Cgp8BoKejycj0=
+github.com/ryanuber/go-glob v1.0.0 h1:iQh3xXAumdQ+4Ufa5b25cRpC5TYKlno6hsv6Cb3pkBk=
+github.com/ryanuber/go-glob v1.0.0/go.mod h1:807d1WSdnB0XRJzKNil9Om6lcp/3a0v4qIHxIXzX/Yc=
 golang.org/x/sys v0.0.0-20210326220804-49726bf1d181 h1:64ChN/hjER/taL4YJuA+gpLfIMT+/NFherRZixbxOhg=
 golang.org/x/sys v0.0.0-20210326220804-49726bf1d181/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
