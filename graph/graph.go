@@ -175,6 +175,8 @@ func Generate(pkgNames []string, cfg cfg.Cfgs) (Graph, error) {
     }
 
     // Add the initial packages
+    // First, resolve the subpackages
+    pkgNames, err = vpkgs.ResolveSubpackages(pkgNames, cfg.Arch, cfg)
     for _, pkgName := range pkgNames {
         fmt.Printf("Graphing %s@%s...\n", pkgName, cfg.Arch)
         err = graph.addPkg(pkgName + "@" + cfg.Arch, cfg)

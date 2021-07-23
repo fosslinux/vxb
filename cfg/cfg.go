@@ -28,6 +28,8 @@ type Cfgs struct {
     Mods bool
     // Information about the system
     SysInfo *unix.Utsname
+    // As a string the machine type
+    MachineType string
     // Default mount type
     MountDefault string
     // Specific package mount types
@@ -353,8 +355,8 @@ func (cfg *Cfgs) ParseGitCfg() {
 func (cfg *Cfgs) EvalAutoMuslExt() {
     // If the architecture is -musl and the host was not manually set, then
     // the host should also be -musl.
-    if str.HasSuffix(cfg.Arch, "-musl") &&
-            cfg.HostArch != string(cfg.SysInfo.Machine[:]) {
+    hostManual := !cfg.Opt.Called("hostarch") || cfg.SysInfo != nil
+    if str.HasSuffix(cfg.Arch, "-musl") && hostManual {
         cfg.HostArch += "-musl"
     }
 }

@@ -78,7 +78,7 @@ func (graphS Graph) DagToDot(fname string) error {
 
     // Loop over source verticies
     for _, vertex := range graph.SourceVertices() {
-        _, err = f.WriteString(fmt.Sprintf("base -> \"%s\"\n", vertex.ID))
+        _, err = f.WriteString(fmt.Sprintf("\"%s\"\n", vertex.ID))
         if err != nil {
             return fmt.Errorf("Unable to write to %s with %w", fname, err)
         }
