@@ -1,9 +1,7 @@
 # vxb
 
 'vxb' or the Void Xbps Builder is a simplistic build scheduler and subsequent
-builder that intends to be used firstly in a short-term capacity by Void Linux
-until a more suitable replacement presents itself, and by users and smaller
-forks of Void Linux interested in building their own package repositories.
+builder.
 
 ## Architecture
 
